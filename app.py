@@ -1,6 +1,9 @@
-from bs4 import BeautifulSoup
 from flask import Flask, request,render_template
-from paylib import payloadTextoSimples,payloadAjuda, payloadReplies
+from flask_mqtt import Mqtt
+
+from paylib import payloadTextoSimples,payloadAjuda, payloadReplies,testepayload
+
+from bs4 import BeautifulSoup
 
 import os
 import traceback
@@ -11,65 +14,73 @@ import urllib.request
 #Funcoes
 from noticias import funcNoticias
 from aleatorio import funcAleatorio
+from wiki import funcWiki
 from piadas import funcPiada
 from tratatexto import tratatexto
-
+from games import funcGames
 #Programa
 app = Flask(__name__)
+
+#Funcionalidades MQTT
+app.config['MQTT_REFRESH_TIME'] = 1.0  
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['MQTT_BROKER_URL'] = 'm12.cloudmqtt.com'
+app.config['MQTT_BROKER_PORT'] = 16903
+app.config['MQTT_USERNAME'] = 'app'
+app.config['MQTT_PASSWORD'] = 'app'
+app.config['MQTT_KEEPALIVE'] = 60
+app.config['MQTT_TLS_ENABLED'] = False
+mqtt = Mqtt(app)
 
 #Pega token.json e poe na variavel dataJson
 dataJson = json.load(open('token.json'))
 
-#Quando for fazer mudanca apenas mudar no json homologacao e aqui o amb para o de baixo :) 
-amb = "producao"
-#amb = "homologacao"
-
+#Quando for fazer mudanca apenas mudar no token.json o ambiente que precisa ser modificado e o devido token :) Evitar mexer no token de producao
+amb = dataJson['ambiente_ativo']
 token = dataJson['ambiente'][amb]['token']
 tokenVerify = dataJson['tokenVerify']
 linkGrafh = dataJson['linkGrafh']
 
 #Entradas
-entrada = ['olá','oi','bom dia','ola','i aew','iae','blz', 'eae', 'e ae']
+entrada = ['ola','oi','bom dia','ola','i aew','iae','blz', 'eae', 'e ae', 'comecar']
 sentimentos = ['bom?','tudo bom?','esta bem?','como vai voce','como vai','voce esta legal','bem?']
-megasena = ['resultado da mega','resultado da mega sena','resultado da megasena','numeros da megasena','megasena','sena']
-trabalho = ['quando começou a trabalhar?','trabalha desde quando','voce trabalha ?','trabalha?']
 tchau = ['ate mais','tchau','xau']
-vindo = ['bem']
-listafuncao = ['funcao', 'funcoes', 'functions', 'func']
+listafuncao = ['catalogo', 'funcao', 'funcoes', 'functions', 'func']
 noticias = ['noticia','news','noticias']
 aleatorio = ['aleatorio', 'randomico']
 teste = ['teste', 'try']
 ajuda = ['ajuda', 'socorro', 'help', 'socoro']
 meuid = ['meuid']
+wiki = ['wikipedia', 'wiki']
+cryptocoin = ['crypto', 'cryptocoin', 'cryptomoeda']
+games = ['jogos', 'games', 'Lançamentos do ano', 'Lançamento de Games']
+
+
+
+@mqtt.on_connect()
+def handle_connect(client, userdata, flags, rc):
+    mqtt.subscribe('comunidade/#')
+
+@mqtt.on_message()
+def handle_mqtt_message(client, userdata, message):
+    data = dict(
+        topic=message.topic,
+        payload=message.payload.decode()
+    )
+    s = message.payload.decode()
+    json_acceptable_string = s.replace("'", "\"")
+    d = json.loads(json_acceptable_string)
+    payloadTextoSimples(d['sender'],d['msg'])
+
+def handle_publish(json_str):
+    data = json.loads(json_str)
+    mqtt.publish(data['topic'], data['message'])
+
 #Funcoes
 def funcFuncao(sender):
-    lista = ['megasena', 'noticias [esporte|time]', 'Aleatorio [Qtd] [Minimo] [Maximo]', 'Socorro']
-    retorno = "Como estou em desevolvimento, tenho somente as seguintes funções"
+    lista = ['CryptoMoeda','Wiki', 'Noticias', 'Aleatorio 6', 'Socorro']
+    retorno = "Tenho Somente as seguintes funções"
     payloadReplies(sender, retorno, lista)
-
-def funcMegasena(sender):
-    #Feita por Alison Aguiar
-    #Em 15/12/2017
-    #Em 01/02/2018 Caio Carnelos percebeu que nao estava funcionando
-    source = requests.get('http://loterias.caixa.gov.br/wps/portal/loterias/landing/megasena/').text
-    soup = BeautifulSoup(source,'lxml')
-    #class numbers mega-sena
-    numeros = soup.find('ul',class_='numbers mega-sena')
-
-    
-    #tratamento de string
-    for i in range(0,12,2):
-        numeros = soup.find('ul',class_='numbers mega-sena')
-        num += '-'+numeros.text[i:i+2]
-
-    result = num[14:31]
-    concurso = soup.find('div',class_='title-bar clearfix')
-    resConc = concurso.h2.span.text
-
-    retorno = 'O resultado do ultimo \n' + resConc + ' \nfoi: ' + result + ' \n\nSaiba mais aqui. \nhttp://loterias.caixa.gov.br/wps/portal/loterias/landing/megasena/\n'
-    payloadTextoSimples(sender,retorno)
-
-
 
 @app.route('/', methods=['GET', 'POST'])
 def webhook():
@@ -83,40 +94,23 @@ def webhook():
             msg = tratatexto(str(text))
 
             #Variaveis
+            '''
             #text = MENSAGEM QUE CHEGA PARA O FACEBOOK
             #msg = text tratado. 
             #sender = quem enviou a msg.
+            '''
             sender = data['entry'][0]['messaging'][0]['sender']['id'] # id do mensageiro
 
             if msg in entrada: 
-                retorno = 'Olá tudo bem,em que posso lhe ajuda, conhece minhas funções ? :)'#Mensagem de retorno ao usuario
+                retorno = 'Olá, tudo bem? Em que posso lhe ajudar, Você já conhece minhas funções? :)'#Mensagem de retorno ao usuario
                 payloadTextoSimples(sender,retorno)
                 funcFuncao(sender)
 
             elif msg in listafuncao:
                 funcFuncao(sender)
-
-            elif msg in megasena:
-                source = requests.get('http://loterias.caixa.gov.br/wps/portal/loterias/landing/megasena/').text
-
-                soup = BeautifulSoup(source,'lxml')
-                #class numbers mega-sena
-                numeros = soup.find('ul',class_='numbers mega-sena')
-
-                result = numeros
-                concurso = soup.find('div',class_='title-bar clearfix')
-                
-                retorno = str(result)
-                payload = {'recipient': {'id': sender}, 'message': {'text': retorno}} 
-                r = requests.post(linkGrafh + token, json=payload) 
-
-                
-            elif msg in trabalho:
-                retorno = 'Eu trabalho desde o dia 12 de dezembro de 2017 e ja estou na minha V41'
-                payloadTextoSimples(sender,retorno) 
-
+               
             elif msg in sentimentos:
-                retorno = 'Estou muito Bem :) Obrigada.'
+                retorno = 'Estou muito Bem :) Obrigado.'
                 payloadTextoSimples(sender,retorno)
 
             elif msg in tchau:
@@ -129,6 +123,10 @@ def webhook():
 
             elif msg in meuid:
                 payloadTextoSimples(sender,str(sender))
+
+            elif msg in teste:
+                testepayload(sender)
+
             else:
                 #Aqui começa a parte via token:
                 splitz = msg.split()
@@ -138,9 +136,18 @@ def webhook():
                 elif splitz[0] in aleatorio:
                     funcAleatorio(sender,msg)
 
+                elif splitz[0] in wiki:
+                    funcWiki(sender,msg)
+
+                elif splitz[0] in games:
+                    funcGames(sender, msg)
+
+                elif splitz[0] in cryptocoin:
+                    from bitcoin import FuncCryptomoeda
+                    FuncCryptomoeda(sender,msg)
 
                 else:
-                    retorno='Isso nao faz parte da minha função'
+                    retorno='Isso não faz parte da minha função.'
                     payloadTextoSimples(sender,retorno)
                     funcFuncao(sender)
             
@@ -155,4 +162,4 @@ def webhook():
     return "Nada retornado"
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug = True)

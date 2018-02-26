@@ -1,3 +1,4 @@
+#coding:utf-8
 import requests
 
 import json
@@ -5,9 +6,7 @@ import json
 dataJson = json.load(open('token.json'))
 
 #Quando for fazer mudanca apenas mudar no json homologacao e aqui o amb para o de baixo :) 
-amb = "producao"
-#amb = "homologacao"
-
+amb = dataJson['ambiente_ativo']
 token = dataJson['ambiente'][amb]['token']
 tokenVerify = dataJson['tokenVerify']
 linkGrafh = dataJson['linkGrafh']
@@ -86,3 +85,47 @@ def payloadReplies(sender,retorno,listaReplies):
   }
 }
 	r = requests.post(linkGrafh + token, json=payload)
+
+
+def testepayload(sender):
+	payloadTextoSimples(sender,"teste")
+	payloadEnv =  {
+  "recipient":{
+    "id":sender
+  },
+  "message":{
+    "attachment":{
+      "type":"template",
+      "payload":{
+        "template_type":"generic",
+        "elements":[
+           {
+            "title":"Welcome to Peter'\''s Hats",
+            "image_url":"https://petersfancybrownhats.com/company_image.png",
+            "subtitle":"We'\''ve got the right hat for everyone.",
+            "default_action": {
+              "type": "web_url",
+              "url": "https://peterssendreceiveapp.ngrok.io/view?item=103",
+              "messenger_extensions": True,
+              "webview_height_ratio": "tall",
+              "fallback_url": "https://peterssendreceiveapp.ngrok.io/"
+            },
+            "buttons":[
+              {
+                "type":"web_url",
+                "url":"https://petersfancybrownhats.com",
+                "title":"View Website"
+              },{
+                "type":"postback",
+                "title":"Start Chatting",
+                "payload":"DEVELOPER_DEFINED_PAYLOAD"
+              }              
+            ]      
+          }
+        ]
+      }
+    }
+  }
+}
+
+	r = requests.post(linkGrafh + token, json=payloadEnv)

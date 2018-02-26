@@ -1,7 +1,7 @@
 from urllib.request import *
 from bs4 import BeautifulSoup
 import urllib
-from paylib import payloadTextoSimples
+from paylib import payloadTextoSimples,payloadReplies
 
 #http://globoesporte.globo.com
 
@@ -12,7 +12,11 @@ def CriarDicionario():
 	#AmericaMG
 	
 	#AtleticoMG
-
+	dicionarioEsportes['atletico-mg'] = "/futebol/times/atletico-mg/"
+	dicionarioEsportes['atleticomg'] = "/futebol/times/atletico-mg/"
+	dicionarioEsportes['galo'] = "/futebol/times/atletico-mg/"
+	dicionarioEsportes['cam'] = "/futebol/times/atletico-mg/"
+	
 	#AtleticoParanaense
 	dicionarioEsportes['atletico-pr'] = "/pr/futebol/times/atletico-pr/"
 	dicionarioEsportes['furacao-pr'] = "/pr/futebol/times/atletico-pr/"
@@ -20,6 +24,8 @@ def CriarDicionario():
 	dicionarioEsportes['atletico-paranaense'] = "/pr/futebol/times/atletico-pr/"
 	dicionarioEsportes['atleticopr'] = "/pr/futebol/times/atletico-pr/"
 	dicionarioEsportes['rubronegro-paranaense'] = "/pr/futebol/times/atletico-pr/"
+	dicionarioEsportes['cap'] = "/pr/futebol/times/atletico-pr/"
+
 
 	#Bahia
 
@@ -107,34 +113,39 @@ def NoticiasGloboEsporte(time, linkTime):
 		link = blocolink[i]
 		
 		#Mexer aqui pra construir JSON do Carrosel 🙂 
-		retorno.append("Noticia {3}: {0},{1} - <{2}> \n".format(noticia,resumo,link['href'],i+1))
+		retorno.append("Noticia {3}: {0},{1} - PARA MAIS INFORMAÇÕES ACESSE:{2} \n".format(noticia,resumo,link['href'],i+1))
 
 	return retorno
 		
 	#payload = {'recipient': {'id': sender}, 'message': {'text': retorno}} 
 	#r = requests.post(linkGrafh + token, json=payload) 
 
-def NoticiaEsporte(mensagem):
-	CriarDicionario()
-	mensagem = mensagem.lower()
-	mensagem = mensagem.split()
-	print(mensagem)
-	#[noticia] [tema|time] [*time]
-	tema = mensagem[1]
-	if tema in dicionarioEsportes:
-		try:
-			time = mensagem[2]
-			if time in dicionarioEsportes:
-				return NoticiasGloboEsporte(time,dicionarioEsportes[time])
-			else:
-				return ["Por enquanto só existem alguns times da Serie A, Aguarde para aumentarmos a cobertura ou confirme se o nome do time esta correto."]
-		except:
-			return NoticiasGloboEsporte(tema,dicionarioEsportes[tema])
-	else:
-		return NoticiasGloboEsporte(tema,dicionarioEsportes[tema])
+def NoticiaEsporte(sender,msg):
+    CriarDicionario()
+    msg = msg.split()
+    if(len(msg) == 1):
+        retorno = 'Para usar a função Noticias, favor seguir o seguinte modelo ex: Noticias [Esporte] / Noticias [Time]'
+        listaReplies = ['Noticias Futebol', 'Noticias Volei', 'Noticias Basquete', 'Noticias F1']
+        payloadReplies(sender,retorno,listaReplies)
+    else:
+        if(msg[1] == 'futebol'):
+            retorno = 'Para usar a função Noticias Futebol, favor seguir o seguinte modelo ex: Noticias [Time]'
+            listaReplies = ['Noticias AtleticoPR', 'Noticias AtleticoMG', 'Noticias Santos', 'Noticias Flamengo']
+            payloadReplies(sender,retorno,listaReplies)
+        if msg[1] in dicionarioEsportes:
+            try:
+                time = mensagem[2]
+                if time in dicionarioEsportes:
+                    return NoticiasGloboEsporte(time,dicionarioEsportes[time])
+                else:
+                    return ["Por enquanto só existem alguns times da Serie A, Aguarde para aumentarmos a cobertura ou confirme se o nome do time esta correto."]
+            except:
+                return NoticiasGloboEsporte(msg[1],dicionarioEsportes[msg[1]])
+        else:
+            return NoticiasGloboEsporte(msg[1],dicionarioEsportes[msg[1]])
 
 def funcNoticias(sender,msg):
-	retorno = NoticiaEsporte(msg)
+	retorno = NoticiaEsporte(sender,msg)
 	print(retorno)
 	for i in retorno:
 		payloadTextoSimples(sender,i)
